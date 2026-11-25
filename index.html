@@ -1,0 +1,578 @@
+<title>跟拉拉熊一起吃</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.css">
+<style>
+/* Layout: teal header band with folder tabs → map (left) + search/filters (right) → place cards */
+:root {
+  --rose: #D6A99D;
+  --rose-deep: #B9806F;
+  --cream: #FBF3D5;
+  --sage: #D6DAC8;
+  --teal: #9CAFAA;
+  --teal-deep: #5F7772;
+
+  --head: #9CAFAA;
+  --head-ink: #FFFFFF;
+  --bg: #FBF3D5;
+  --surface: #FFFDF5;
+  --surface-2: #F3EDD3;
+  --ink: #3B3A36;
+  --ink-2: #6C6A60;
+  --line: #E6DFC3;
+  --chip: #FFFDF5;
+  --chip-ink: #3E4A46;
+  --chip-on: #9CAFAA;
+  --chip-on-ink: #FFFFFF;
+  --heart: #C98877;
+  --tag-bg: #F4E2DC;
+  --tag-ink: #8E5B4E;
+  --shadow: 0 1px 2px rgba(80, 70, 40, .08), 0 2px 8px rgba(80, 70, 40, .06);
+
+  /* map (Google Maps look) */
+  --sea: #AADAFF;
+  --land: #F5F3EE;
+  --town-line: #DCDAD3;
+  --county-line: #A8A59C;
+  --map-label: #5F6368;
+
+  --font: Roboto, "Noto Sans TC", Arial, "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --head: #3F4E4B; --head-ink: #F1EBD3;
+    --bg: #23282A; --surface: #2C3335; --surface-2: #343C3E;
+    --ink: #F1EBD3; --ink-2: #B5B5A6; --line: #3E4749;
+    --chip: #2C3335; --chip-ink: #D6DAC8; --chip-on: #9CAFAA; --chip-on-ink: #1E2425;
+    --heart: #E0B1A4; --tag-bg: #4A3934; --tag-ink: #EBC3B8;
+    --teal-deep: #B4C7C2; --rose-deep: #E0B1A4;
+    --shadow: 0 1px 2px rgba(0,0,0,.3);
+    --sea: #17263C; --land: #2B3236; --town-line: #3A4247; --county-line: #6B767C; --map-label: #B8C0C4;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --head: #3F4E4B; --head-ink: #F1EBD3;
+  --bg: #23282A; --surface: #2C3335; --surface-2: #343C3E;
+  --ink: #F1EBD3; --ink-2: #B5B5A6; --line: #3E4749;
+  --chip: #2C3335; --chip-ink: #D6DAC8; --chip-on: #9CAFAA; --chip-on-ink: #1E2425;
+  --heart: #E0B1A4; --tag-bg: #4A3934; --tag-ink: #EBC3B8;
+  --teal-deep: #B4C7C2; --rose-deep: #E0B1A4;
+  --shadow: 0 1px 2px rgba(0,0,0,.3);
+  --sea: #17263C; --land: #2B3236; --town-line: #3A4247; --county-line: #6B767C; --map-label: #B8C0C4;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 1100; background: var(--head);
+}
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Header band */
+.top {
+  background: var(--head); color: var(--head-ink);
+  margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.brand { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-block: 24px 22px; }
+.brand-text { flex: 1 1 auto; min-width: 0; }
+.brand h1 {
+  margin: 0; font-size: clamp(28px, 5vw, 40px); font-weight: 900; letter-spacing: .03em; line-height: 1.2;
+  display: flex; align-items: center; gap: 12px; text-wrap: balance;
+}
+.bear {
+  width: 1.3em; height: 1.3em; flex: none; border-radius: 50%;
+  object-fit: cover; background: var(--cream);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.55);
+}
+.brand p { margin: 6px 0 0; font-size: 14px; font-weight: 500; opacity: .92; }
+.follow {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px; text-decoration: none;
+  font-size: 13px; font-weight: 500;
+  background: var(--rose); color: #3B2A25; box-shadow: var(--shadow);
+}
+.follow:hover { background: var(--rose-deep); color: #fff; }
+.follow:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.follow svg { width: 16px; height: 16px; }
+
+/* Folder tabs */
+.tabs { display: flex; gap: 6px; }
+.tab {
+  appearance: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 16px; font-weight: 700;
+  color: var(--head-ink); background: transparent; opacity: .85;
+  padding: 12px 20px; border-radius: 14px 14px 0 0;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.tab:hover { opacity: 1; background: rgba(255,255,255,.12); }
+.tab .n {
+  font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums;
+  padding: 1px 9px; border-radius: 999px; background: rgba(255,255,255,.28);
+}
+.tab[aria-selected="true"] { background: var(--bg); color: var(--ink); opacity: 1; }
+.tab[aria-selected="true"] .n { background: var(--sage); color: #3E4A46; }
+.tab[aria-selected="true"] .heart-ico { color: var(--heart); }
+.tab:focus-visible { outline: 2px solid var(--rose-deep); outline-offset: -2px; }
+.heart-ico, .check-ico { width: 16px; height: 16px; }
+
+/* Map + filters */
+.explore {
+  display: grid; gap: 20px; padding-block: 20px 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 760px) { .explore { grid-template-columns: 1fr; } }
+.map-box { position: relative; }
+#map {
+  height: 400px; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow);
+  background: var(--sea); font-family: var(--font);
+}
+@media (max-width: 760px) { #map { height: 340px; } }
+.map-note {
+  position: absolute; left: 12px; bottom: 12px; z-index: 500;
+  background: var(--surface); color: var(--ink-2); font-size: 12px;
+  padding: 4px 12px; border-radius: 999px; box-shadow: var(--shadow);
+  max-width: calc(100% - 24px);
+}
+.filters { display: grid; gap: 16px; }
+.search {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border-radius: 999px; padding: 0 20px;
+  box-shadow: var(--shadow); border: 1px solid var(--line);
+}
+.search svg { width: 18px; height: 18px; color: var(--teal-deep); flex: none; }
+.search input {
+  border: 0; background: none; color: var(--ink); font: inherit; font-size: 15px;
+  padding: 14px 0; width: 100%; min-width: 0;
+}
+.search input:focus-visible { outline: none; }
+.search:focus-within { outline: 2px solid var(--teal); }
+.group h2 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--ink-2); letter-spacing: .04em; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  appearance: none; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 14px; font-weight: 500;
+  background: var(--chip); color: var(--chip-ink);
+  border: 1px solid var(--line);
+  padding: 7px 14px; border-radius: 999px;
+}
+.chip:hover { border-color: var(--teal); }
+.chip .c { opacity: .6; margin-left: 5px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); }
+.chip:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--rose-deep); outline-offset: 2px; }
+
+/* Results */
+main { padding-block: 12px 48px; }
+.result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.result-head .total { color: var(--ink-2); font-size: 14px; }
+select {
+  font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 12px; cursor: pointer;
+}
+.section { margin-bottom: 28px; }
+.section h3.sec { font-size: 16px; font-weight: 700; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.section h3.sec .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rose); }
+.section h3.sec .c { color: var(--ink-2); font-weight: 400; font-size: 13px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.card {
+  background: var(--surface); border-radius: 14px; box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;
+}
+.card .head { display: flex; align-items: flex-start; gap: 8px; }
+.card h4 { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; flex: 1; overflow-wrap: anywhere; }
+.card .fav { color: var(--heart); width: 18px; height: 18px; flex: none; margin-top: 3px; }
+.meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--ink-2); }
+.tag { background: var(--tag-bg); color: var(--tag-ink); padding: 1px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.tag.done { background: var(--sage); color: #3E4A46; }
+.addr { font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.items { font-size: 13px; color: var(--ink); }
+.items b { color: var(--rose-deep); font-weight: 500; }
+.comment { font-size: 13px; color: var(--ink); background: var(--surface-2); padding: 6px 10px; border-radius: 8px; }
+.actions { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 500; text-decoration: none;
+  padding: 6px 12px; border-radius: 999px;
+  color: var(--teal-deep); border: 1px solid var(--teal); background: transparent;
+}
+.btn:hover { background: color-mix(in srgb, var(--teal) 18%, transparent); }
+.btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+.btn.primary:hover { background: var(--teal-deep); border-color: var(--teal-deep); }
+:root[data-theme="dark"] .btn.primary { color: #1E2425; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #1E2425; } }
+.btn.save { color: var(--rose-deep); border-color: var(--rose); }
+.btn.save:hover { background: color-mix(in srgb, var(--rose) 22%, transparent); }
+.btn svg { width: 14px; height: 14px; }
+.empty {
+  text-align: center; color: var(--ink-2); padding: 48px 16px;
+  background: var(--surface); border-radius: 14px; border: 1px dashed var(--line);
+}
+footer { color: var(--ink-2); font-size: 12px; padding-block: 0 32px; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 1200;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  width: min(92vw, 420px);
+  background: var(--ink); color: var(--bg);
+  padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+.toast b { color: var(--rose); font-weight: 700; }
+
+/* Leaflet theming */
+.leaflet-container { background: var(--sea); font-family: var(--font); }
+.leaflet-bar a { background: var(--surface); color: var(--ink); border-bottom-color: var(--line); }
+.leaflet-bar a:hover { background: var(--surface-2); }
+.leaflet-control-attribution { background: color-mix(in srgb, var(--surface) 80%, transparent) !important; color: var(--ink-2); font-size: 10px; }
+.area-label {
+  color: var(--map-label); font-size: 12px; font-weight: 500; white-space: nowrap;
+  text-shadow: 0 0 3px var(--land), 0 0 3px var(--land), 0 0 2px var(--land);
+  transform: translate(-50%, -50%); pointer-events: none; width: max-content !important; height: auto !important;
+}
+.area-label.town { font-size: 11px; font-weight: 400; opacity: .9; }
+.pin svg { width: 30px; height: 40px; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.35)); display: block; }
+.cluster {
+  display: grid; place-items: center; border-radius: 50%;
+  font-weight: 700; font-size: 13px; color: #fff;
+  border: 3px solid rgba(255,255,255,.85); box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.cluster.visited { background: #C98877; }
+.cluster.wish { background: #7F9893; }
+.leaflet-popup-content-wrapper { border-radius: 10px; background: var(--surface); color: var(--ink); }
+.leaflet-popup-tip { background: var(--surface); }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.45; min-width: 200px; }
+.pop h4 { margin: 0 0 4px; font-size: 15px; font-weight: 500; }
+.pop .meta { margin-bottom: 4px; }
+.pop .addr { margin-bottom: 8px; }
+.pop .actions { padding-top: 0; }
+.leaflet-container a.btn.primary { color: #fff; }
+.leaflet-container a.btn { color: var(--teal-deep); }
+.leaflet-container a.btn.save { color: var(--rose-deep); }
+
+@media (max-width: 520px) {
+  .tab { padding-inline: 14px; font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-text">
+        <h1>跟拉拉熊一起吃 <img class="bear" src="bear.png" alt="拉拉熊"></h1>
+        <p id="sub">他吃過說好吃的店，和收藏在愛心清單裡的口袋名單</p>
+      </div>
+      <a class="follow" id="follow" href="#" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/></svg>
+        <span id="follow-text">整份清單存到我的 Google 地圖</span>
+      </a>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-visited" aria-selected="true" data-view="visited">
+        <svg class="check-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>
+        已去過 <span class="n" id="n-visited"></span>
+      </button>
+      <button class="tab" role="tab" id="tab-wish" aria-selected="false" data-view="wish">
+        <svg class="heart-ico" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6.9-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>
+        愛心清單 <span class="n" id="n-wish"></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<section class="wrap explore">
+  <div class="map-box">
+    <div id="map" role="region" aria-label="台灣地圖"></div>
+    <div class="map-note" id="mapnote">全台分布・點圖釘找店</div>
+  </div>
+  <div class="filters">
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input id="q" type="search" placeholder="搜尋店名、區域、品項…" autocomplete="off">
+    </label>
+    <div class="group">
+      <h2>地區</h2>
+      <div class="chips" id="cities" role="group" aria-label="地區"></div>
+    </div>
+    <div class="group">
+      <h2>類型</h2>
+      <div class="chips" id="chips" role="group" aria-label="類型"></div>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="result-head">
+    <span class="total" id="total"></span>
+    <select id="sort" aria-label="排序">
+      <option value="cat">依類型分組</option>
+      <option value="new">最新加入在前</option>
+    </select>
+  </div>
+  <div id="results"></div>
+</main>
+<footer class="wrap" id="foot"></footer>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="data.js"></script>
+<script src="taiwan.js"></script>
+<script>
+(function () {
+  const D = window.LALA_DATA || { visited: [], wish: [], lists: {} };
+  const ORDER = ['台式小吃・飯', '麵食・水餃', '牛肉麵・牛肉湯', '拉麵', '燒烤・鍋物', '異國料理', '早午餐・漢堡・麵包', '甜點・冰品', '飲料・咖啡・酒', '其他美食', '景點・生活'];
+  const CITY_ORDER = ['台北市', '新北市', '基隆市', '桃園市', '新竹市', '台中市', '嘉義市', '台南市', '高雄市', '屏東縣', '金門縣', '日本', '其他'];
+  const SHARE_LINKS = { visited: 'https://maps.app.goo.gl/HtRYE5HMD8fn4ozE6', wish: 'https://maps.app.goo.gl/9F4STeGY5pzf7cwi8' };
+  const visitedIds = new Set(D.visited.map(p => p.cid));
+
+  const state = { view: 'visited', cat: '全部', city: '全部', q: '', sort: 'cat' };
+  try { const s = JSON.parse(localStorage.getItem('lala-state') || '{}'); if (s.view === 'visited' || s.view === 'wish') state.view = s.view; } catch (e) {}
+  const save = () => { try { localStorage.setItem('lala-state', JSON.stringify({ view: state.view })); } catch (e) {} };
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const district = p => { const m = p.addr.match(/[市縣](.{1,3}?[區鎮鄉市])/); return m ? m[1] : ''; };
+  const shortCity = c => c === '日本' ? c : c.replace(/[市縣]$/, '');
+  const placeOf = p => [shortCity(p.city), district(p)].filter(Boolean).join('・');
+
+  $('n-visited').textContent = D.visited.length;
+  $('n-wish').textContent = D.wish.length;
+  if (D.updated) $('sub').textContent += `・更新於 ${D.updated}`;
+  $('foot').textContent = '資料來自 Google 地圖清單。點「地圖」可在 Google 地圖看營業時間與評論。';
+
+  const HEART = '<svg class="fav" viewBox="0 0 24 24" fill="currentColor" aria-label="愛心"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.6 1.1 4.6 2.6.9-1.5 2.5-2.6 4.6-2.6 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>';
+  const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+  const NAV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 21 3l-8 18-2-8z"/></svg>';
+  const MAPI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>';
+  const SAVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/></svg>';
+
+  function list() { return state.view === 'visited' ? D.visited : D.wish; }
+  function matches(p, skip) {
+    if (skip !== 'cat' && state.cat !== '全部' && p.cat !== state.cat) return false;
+    if (skip !== 'city' && state.city !== '全部' && p.city !== state.city) return false;
+    if (state.q) {
+      const hay = (p.name + p.addr + (p.items || []).join('') + (p.comment || '') + p.cat).toLowerCase();
+      if (!hay.includes(state.q.toLowerCase())) return false;
+    }
+    return true;
+  }
+
+  function chipsHtml(values, current, counts, key) {
+    return values.map(v => `<button class="chip" aria-pressed="${current === v}" data-${key}="${v}">${v === '全部' ? v : (key === 'city' ? shortCity(v) : v)}<span class="c">${counts(v)}</span></button>`).join('');
+  }
+
+  function renderFilters() {
+    const all = list();
+    const cities = CITY_ORDER.filter(c => all.some(p => p.city === c));
+    if (state.city !== '全部' && !cities.includes(state.city)) state.city = '全部';
+    const cats = ORDER.filter(c => all.some(p => p.cat === c));
+    if (state.cat !== '全部' && !cats.includes(state.cat)) state.cat = '全部';
+
+    const cityPool = all.filter(p => matches(p, 'city'));
+    $('cities').innerHTML = chipsHtml(['全部', ...cities], state.city,
+      v => v === '全部' ? cityPool.length : cityPool.filter(p => p.city === v).length, 'city');
+    const catPool = all.filter(p => matches(p, 'cat'));
+    $('chips').innerHTML = chipsHtml(['全部', ...cats], state.cat,
+      v => v === '全部' ? catPool.length : catPool.filter(p => p.cat === v).length, 'cat');
+  }
+
+  function linkButtons(p) {
+    return `<a class="btn primary" href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener">${PIN}地圖</a>
+      <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">${NAV}導航</a>
+      <a class="btn save" data-save href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener">${SAVE}存到我的清單</a>`;
+  }
+
+  function card(p) {
+    const items = (p.items && p.items.length) ? `<div class="items"><b>必點</b>　${p.items.map(esc).join('、')}</div>` : '';
+    const comment = p.comment ? `<div class="comment">${esc(p.comment)}</div>` : '';
+    const done = state.view === 'wish' && visitedIds.has(p.cid) ? '<span class="tag done">已吃過</span>' : '';
+    const onMap = p.city !== '日本' ? `<button class="btn" data-show="${p.cid}">${MAPI}看位置</button>` : '';
+    return `<article class="card">
+      <div class="head"><h4>${esc(p.name)}</h4>${state.view === 'wish' ? HEART : ''}</div>
+      <div class="meta">${state.sort === 'new' ? `<span class="tag">${p.cat}</span>` : ''}${done}<span>${esc(placeOf(p))}</span></div>
+      <div class="addr">${esc(p.addr)}</div>
+      ${items}${comment}
+      <div class="actions">${linkButtons(p)}${onMap}</div>
+    </article>`;
+  }
+
+  function renderList(items) {
+    $('total').textContent = `共 ${items.length} 個地點`;
+    const out = $('results');
+    if (!items.length) {
+      out.innerHTML = `<div class="empty">找不到符合的店。試試其他關鍵字，或把地區、類型改回「全部」。</div>`;
+      return;
+    }
+    if (state.sort === 'new') {
+      const sorted = [...items].sort((a, b) => b.added - a.added);
+      out.innerHTML = `<div class="grid">${sorted.map(card).join('')}</div>`;
+      return;
+    }
+    out.innerHTML = ORDER.filter(c => items.some(p => p.cat === c)).map(c => {
+      const group = items.filter(p => p.cat === c).sort((a, b) => b.added - a.added);
+      return `<section class="section"><h3 class="sec"><span class="dot"></span>${c}<span class="c">${group.length} 家</span></h3>
+        <div class="grid">${group.map(card).join('')}</div></section>`;
+    }).join('');
+  }
+
+  /* ---------- Map ---------- */
+  let map = null, cluster = null, markers = {};
+  const TW_BOUNDS = [[21.85, 119.9], [25.35, 122.05]];
+
+  function pinSvg(kind) {
+    const fill = kind === 'visited' ? '#C98877' : '#6F8A84';
+    const inner = kind === 'visited'
+      ? '<path d="M11 8v5.5a1.5 1.5 0 0 0 1.5 1.5V22h1v-7a1.5 1.5 0 0 0 1.5-1.5V8M13 8v4M19 8c-1.2 0-2 1.6-2 3.5S17.6 14 18.5 14V22h1V8z" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+      : '<path d="M15 21s-4.5-2.8-5.7-5.6c-.9-2 .4-4.3 2.6-4.3 1.3 0 2.2.7 2.8 1.6.6-.9 1.5-1.6 2.8-1.6 2.2 0 3.5 2.3 2.6 4.3C19.5 18.2 15 21 15 21z" fill="#fff"/>';
+    return `<svg viewBox="0 0 30 40"><path d="M15 39C15 39 2 23.5 2 14a13 13 0 0 1 26 0c0 9.5-13 25-13 25z" fill="${fill}" stroke="#fff" stroke-width="1.5"/>${inner}</svg>`;
+  }
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  function buildMap() {
+    if (map || !window.L) return;
+    map = L.map('map', {
+      zoomControl: true, attributionControl: true, preferCanvas: true,
+      minZoom: 6.5, maxZoom: 17, zoomSnap: 0.5, scrollWheelZoom: false,
+      maxBounds: [[20.5, 117.5], [26.8, 123.5]], maxBoundsViscosity: 0.8,
+    });
+    map.attributionControl.setPrefix(false).addAttribution('行政區界：內政部國土測繪中心');
+    map.fitBounds(TW_BOUNDS);
+    map.on('click focus', () => map.scrollWheelZoom.enable());
+    map.on('mouseout', () => map.scrollWheelZoom.disable());
+
+    const topo = window.TW_TOPO;
+    if (topo && window.topojson) {
+      const towns = topojson.feature(topo, topo.objects.towns);
+      const townStyle = () => ({ color: cssVar('--town-line'), weight: 0.7, fillColor: cssVar('--land'), fillOpacity: 1 });
+      const townLayer = L.geoJSON(towns, { style: townStyle, interactive: false }).addTo(map);
+      const countyLines = topojson.mesh(topo, topo.objects.counties, (a, b) => a !== b);
+      const countyLayer = L.geoJSON(countyLines, { style: () => ({ color: cssVar('--county-line'), weight: 1.2, dashArray: '4 3', fill: false }), interactive: false }).addTo(map);
+
+      const countyLbl = L.layerGroup(), townLbl = L.layerGroup();
+      const fixed = { '新北市': [24.93, 121.63], '基隆市': [25.12, 121.72], '臺北市': [25.07, 121.56], '台北市': [25.07, 121.56] };
+      topojson.feature(topo, topo.objects.counties).features.forEach(f => {
+        const name = f.properties.COUNTYNAME;
+        const c = fixed[name] || L.geoJSON(f).getBounds().getCenter();
+        L.marker(c, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'area-label', html: name.replace('臺', '台') }) }).addTo(countyLbl);
+      });
+      towns.features.forEach(f => {
+        const c = L.geoJSON(f).getBounds().getCenter();
+        L.marker(c, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'area-label town', html: f.properties.TOWNNAME }) }).addTo(townLbl);
+      });
+      const syncLabels = () => {
+        const z = map.getZoom();
+        if (z < 8) { map.removeLayer(countyLbl); map.removeLayer(townLbl); }
+        else if (z < 11.5) { map.addLayer(countyLbl); map.removeLayer(townLbl); }
+        else { map.removeLayer(countyLbl); map.addLayer(townLbl); }
+      };
+      map.on('zoomend', syncLabels); syncLabels();
+
+      const restyle = () => { townLayer.setStyle(townStyle()); countyLayer.setStyle({ color: cssVar('--county-line') }); };
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', restyle);
+      new MutationObserver(restyle).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+  }
+
+  function popupHtml(p) {
+    const done = state.view === 'wish' && visitedIds.has(p.cid) ? '<span class="tag done">已吃過</span>' : '';
+    return `<div class="pop"><h4>${esc(p.name)}</h4>
+      <div class="meta"><span class="tag">${p.cat}</span>${done}<span>${esc(placeOf(p))}</span></div>
+      <div class="addr">${esc(p.addr)}</div>
+      <div class="actions">${linkButtons(p)}</div></div>`;
+  }
+
+  function renderMap(items) {
+    buildMap();
+    if (!map) { $('mapnote').textContent = '地圖載入失敗，請重新整理頁面'; return; }
+    if (cluster) map.removeLayer(cluster);
+    const kind = state.view;
+    cluster = L.markerClusterGroup({
+      maxClusterRadius: 44, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
+      iconCreateFunction: c => {
+        const n = c.getChildCount(); const s = n < 10 ? 32 : n < 50 ? 38 : 46;
+        return L.divIcon({ html: `<div class="cluster ${kind}" style="width:${s}px;height:${s}px">${n}</div>`, className: '', iconSize: [s, s] });
+      },
+    });
+    markers = {};
+    const onMap = items.filter(p => p.city !== '日本');
+    onMap.forEach(p => {
+      const m = L.marker([p.lat, p.lng], {
+        title: p.name,
+        icon: L.divIcon({ className: 'pin', html: pinSvg(kind), iconSize: [30, 40], iconAnchor: [15, 39], popupAnchor: [0, -34] }),
+      }).bindPopup(() => popupHtml(p), { maxWidth: 280 });
+      markers[p.cid] = m;
+      cluster.addLayer(m);
+    });
+    map.addLayer(cluster);
+    const away = items.length - onMap.length;
+    $('mapnote').textContent = state.city === '全部' ? '全台分布・點圖釘找店' : `${shortCity(state.city)}・${onMap.length} 個地點`;
+    if (away) $('mapnote').textContent += `（另有 ${away} 個在日本）`;
+    setTimeout(() => {
+      map.invalidateSize();
+      if (state.city === '全部' && onMap.length > 3) map.fitBounds(TW_BOUNDS);
+      else if (onMap.length) map.fitBounds(L.latLngBounds(onMap.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom: 15 });
+      else map.fitBounds(TW_BOUNDS);
+    }, 0);
+  }
+
+  function showOnMap(cid) {
+    const m = markers[cid]; if (!m) return;
+    document.querySelector('.map-box').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    cluster.zoomToShowLayer(m, () => m.openPopup());
+  }
+
+  let toastTimer = null;
+  function toast(html) {
+    const t = $('toast'); t.innerHTML = html; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 7000);
+  }
+
+  function render() {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view === state.view));
+    $('follow').href = SHARE_LINKS[state.view];
+    $('follow-text').textContent = state.view === 'visited' ? '「已去過」整份存到我的 Google 地圖' : '「愛心清單」整份存到我的 Google 地圖';
+    renderFilters();
+    const items = list().filter(p => matches(p));
+    renderMap(items);
+    renderList(items);
+  }
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    state.view = t.dataset.view; state.cat = '全部'; state.city = '全部'; save(); render();
+  }));
+  $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { state.cat = b.dataset.cat; render(); } });
+  $('cities').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { state.city = b.dataset.city; render(); } });
+  $('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+  $('q').addEventListener('input', e => { state.q = e.target.value.trim(); render(); });
+  document.addEventListener('click', e => {
+    const show = e.target.closest('[data-show]');
+    if (show) { showOnMap(show.dataset.show); return; }
+    if (e.target.closest('[data-save]')) {
+      toast('已在 Google 地圖打開這家店。點 <b>「儲存」</b>，選 <b>「想去的地點」</b>（或你自己的清單）就加入了。');
+    } else if (e.target.closest('#follow')) {
+      toast('已打開 Google 地圖清單。點 <b>「追蹤」</b>，整份清單就會出現在你的「已儲存」裡，之後他新增的店也會同步。');
+    }
+  });
+
+  render();
+})();
+</script>
