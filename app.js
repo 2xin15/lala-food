@@ -606,12 +606,15 @@
   $('detail-dlg').addEventListener('close', () => { $('detail-dlg-body').innerHTML = ''; if (lastFocus && document.contains(lastFocus)) lastFocus.focus(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.sel && !document.querySelector('dialog[open]')) deselect(); });
 
+  let signingIn = false;
   function signIn() {
     if (!window.LalaCloud) { toast('Google 登入正在載入，請稍候再試。'); return; }
+    if (signingIn) return; // 已經開了登入視窗，避免連點把它取消
+    signingIn = true;
     window.LalaCloud.signIn().catch(err => {
-      if (err && err.code === 'auth/popup-closed-by-user') return;
+      if (err && ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(err.code)) return;
       console.error(err); toast('登入沒有成功，請再試一次。');
-    });
+    }).finally(() => { signingIn = false; });
   }
 
   // 頁首高度（手機底部分頁列在 CSS 處理）
