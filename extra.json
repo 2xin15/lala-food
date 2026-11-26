@@ -1,5 +1,8 @@
 {
-  "_說明": "手動補充的「已去過」地點；update.mjs 每次更新都會合併進去。visited_add：不在他 Google 清單裡、但 Threads 有吃過紀錄的地點。visited_from_wish：在愛心清單裡、但 Threads 有吃過證據的地點 CID，會一併列入已去過。",
+  "_說明": "手動補充的「已去過」地點；update.mjs 每次更新都會合併進去。visited_add：不在他 Google 清單裡、但 Threads 有吃過紀錄的地點。visited_from_wish：在愛心清單裡、但 Threads 有吃過證據的地點 CID，會一併列入已去過。visited_remove：他的已去過清單裡有、但其實沒吃過的地點 CID，會從已去過拿掉。",
+  "visited_remove": {
+    "14033011182876868399": "忠貞米干（中壢中正五路210號）— 他吃的是隔壁的忠貞眷村口米干 麻辣滷味，不是這家"
+  },
   "visited_add": [
     { "name": "鼎泰豐 101店", "addr": "110臺北市信義區西村里市府路45號B1", "lat": 25.0333371, "lng": 121.5646596, "cid": "5895780768888079129", "source": "https://www.threads.com/@zeke_6973" },
     { "name": "香港澳華燒鵝", "addr": "106臺北市大安區通安里通化街38巷21號", "lat": 25.0309662, "lng": 121.5534022, "cid": "5729948388158024662", "source": "https://www.threads.com/share/BAYgjoiXTv" },

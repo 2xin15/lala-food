@@ -93,6 +93,11 @@ const wish = (await fetchList(LISTS.wish)).map(attachNotes);
 
 // extra.json：手動補進「已去過」的地點（Threads 有吃過紀錄，但不在他的已去過清單）
 const extra = existsSync('extra.json') ? JSON.parse(readFileSync('extra.json', 'utf8')) : {};
+// visited_remove：他清單裡有、但其實沒吃過的地點，從已去過拿掉
+for (const cid of Object.keys(extra.visited_remove || {})) {
+  const i = visited.findIndex((p) => p.cid === cid);
+  if (i >= 0) visited.splice(i, 1);
+}
 const visitedIds = new Set(visited.map((p) => p.cid));
 for (const cid of Object.keys(extra.visited_from_wish || {})) {
   const p = wish.find((w) => w.cid === cid);
