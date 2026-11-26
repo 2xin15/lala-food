@@ -260,7 +260,7 @@ footer { color: var(--ink-2); font-size: 12px; padding-block: 0 32px; }
 .cluster.wish { background: #7F9893; }
 .leaflet-popup-content-wrapper { border-radius: 10px; background: var(--surface); color: var(--ink); }
 .leaflet-popup-tip { background: var(--surface); }
-.leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.45; min-width: 200px; }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.45; min-width: min(250px, 62vw); }
 .pop h4 { margin: 0 0 4px; font-size: 15px; font-weight: 500; }
 .pop .meta { margin-bottom: 4px; }
 .pop .addr { margin-bottom: 8px; }
@@ -281,7 +281,13 @@ footer { color: var(--ink-2); font-size: 12px; padding-block: 0 32px; }
 .linkbtn { appearance: none; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--teal-deep); text-decoration: underline; text-underline-offset: 2px; }
 .linkbtn:hover { color: var(--rose-deep); }
 .tag.has-post { background: var(--surface-2); color: var(--rose-deep); }
-.pop .post-btn { margin: 2px 0 8px; }
+.pop-post { display: grid; gap: 4px; margin-top: 10px; padding: 8px 10px; background: var(--surface-2); border-radius: 10px; }
+.pop-post .posts-h .when { margin-left: auto; font-weight: 400; color: var(--ink-2); font-size: 11.5px; }
+.pop-post q { quotes: none; font-size: 12.5px; line-height: 1.55; white-space: pre-line;
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.pop-post .row { display: flex; gap: 12px; flex-wrap: wrap; }
+.leaflet-container .linkbtn { color: var(--teal-deep); }
+.hint { margin: 0; font-size: 12px; color: var(--ink-2); }
 
 dialog.reader {
   border: 0; padding: 0; border-radius: 16px; background: var(--surface); color: var(--ink);
@@ -354,6 +360,11 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
       <h2>類型</h2>
       <div class="chips" id="chips" role="group" aria-label="類型"></div>
     </div>
+    <div class="group">
+      <h2>其他</h2>
+      <div class="chips" id="extras" role="group" aria-label="其他篩選"></div>
+    </div>
+    <p class="hint">地區和類型都可以複選；再點一次可取消。</p>
   </div>
 </section>
 
@@ -400,7 +411,7 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
   const POSTS = window.LALA_POSTS || {};
   const postsOf = p => POSTS[p.cid] || [];
 
-  const state = { view: 'visited', cat: '全部', city: '全部', q: '', sort: 'cat' };
+  const state = { view: 'visited', cats: new Set(), cities: new Set(), postOnly: false, q: '', sort: 'cat' };
   try { const s = JSON.parse(localStorage.getItem('lala-state') || '{}'); if (s.view === 'visited' || s.view === 'wish') state.view = s.view; } catch (e) {}
   const save = () => { try { localStorage.setItem('lala-state', JSON.stringify({ view: state.view })); } catch (e) {} };
 
@@ -424,8 +435,9 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
 
   function list() { return state.view === 'visited' ? D.visited : D.wish; }
   function matches(p, skip) {
-    if (skip !== 'cat' && state.cat !== '全部' && p.cat !== state.cat) return false;
-    if (skip !== 'city' && state.city !== '全部' && p.city !== state.city) return false;
+    if (skip !== 'cat' && state.cats.size && !state.cats.has(p.cat)) return false;
+    if (skip !== 'city' && state.cities.size && !state.cities.has(p.city)) return false;
+    if (skip !== 'post' && state.postOnly && !postsOf(p).length) return false;
     if (state.q) {
       const hay = (p.name + p.addr + (p.items || []).join('') + (p.comment || '') + p.cat + postsOf(p).map(x => x.text).join('')).toLowerCase();
       if (!hay.includes(state.q.toLowerCase())) return false;
@@ -433,24 +445,32 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
     return true;
   }
 
-  function chipsHtml(values, current, counts, key) {
-    return values.map(v => `<button class="chip" aria-pressed="${current === v}" data-${key}="${v}">${v === '全部' ? v : (key === 'city' ? shortCity(v) : v)}<span class="c">${counts(v)}</span></button>`).join('');
+  // 複選：set 為空 = 全部
+  function chipsHtml(values, selected, counts, key) {
+    return values.map(v => {
+      const on = v === '全部' ? selected.size === 0 : selected.has(v);
+      const label = v === '全部' ? v : (key === 'city' ? shortCity(v) : v);
+      return `<button class="chip" aria-pressed="${on}" data-${key}="${v}">${label}<span class="c">${counts(v)}</span></button>`;
+    }).join('');
   }
 
   function renderFilters() {
     const all = list();
     const cities = CITY_ORDER.filter(c => all.some(p => p.city === c));
-    if (state.city !== '全部' && !cities.includes(state.city)) state.city = '全部';
+    state.cities.forEach(c => { if (!cities.includes(c)) state.cities.delete(c); });
     const cats = ORDER.filter(c => all.some(p => p.cat === c));
-    if (state.cat !== '全部' && !cats.includes(state.cat)) state.cat = '全部';
+    state.cats.forEach(c => { if (!cats.includes(c)) state.cats.delete(c); });
 
     const cityPool = all.filter(p => matches(p, 'city'));
-    $('cities').innerHTML = chipsHtml(['全部', ...cities], state.city,
+    $('cities').innerHTML = chipsHtml(['全部', ...cities], state.cities,
       v => v === '全部' ? cityPool.length : cityPool.filter(p => p.city === v).length, 'city');
     const catPool = all.filter(p => matches(p, 'cat'));
-    $('chips').innerHTML = chipsHtml(['全部', ...cats], state.cat,
+    $('chips').innerHTML = chipsHtml(['全部', ...cats], state.cats,
       v => v === '全部' ? catPool.length : catPool.filter(p => p.cat === v).length, 'cat');
+    const postPool = all.filter(p => matches(p, 'post'));
+    $('extras').innerHTML = `<button class="chip" aria-pressed="${state.postOnly}" data-post>只看有拉拉熊文章<span class="c">${postPool.filter(p => postsOf(p).length).length}</span></button>`;
   }
+  function toggleIn(set, v) { if (v === '全部') set.clear(); else if (set.has(v)) set.delete(v); else set.add(v); }
 
   function linkButtons(p) {
     return `<a class="btn primary" href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener">${PIN}地圖</a>
@@ -573,8 +593,21 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
     return `<div class="pop"><h4>${esc(p.name)}</h4>
       <div class="meta"><span class="tag">${p.cat}</span>${done}<span>${esc(placeOf(p))}</span></div>
       <div class="addr">${esc(p.addr)}</div>
-      ${postsOf(p).length ? `<button class="linkbtn post-btn" data-read="${p.cid}" data-i="0">看拉拉熊的文章（${postsOf(p).length}）</button>` : ''}
-      <div class="actions">${linkButtons(p)}</div></div>`;
+      <div class="actions">${linkButtons(p)}</div>
+      ${popPostHtml(p)}</div>`;
+  }
+  // 地圖卡下方：拉拉熊的原始評價
+  function popPostHtml(p) {
+    const ps = postsOf(p); if (!ps.length) return '';
+    const x = ps[ps.length - 1];
+    return `<div class="pop-post">
+      <div class="posts-h">${QUOTE}拉拉熊的原始評價<span class="when">${fmtDate(x.date)}</span></div>
+      ${x.text ? `<q>${esc(x.text)}</q>` : ''}
+      <div class="row">
+        <button class="linkbtn" data-read="${p.cid}" data-i="${ps.length - 1}">預覽文章與照片${ps.length > 1 ? `（共 ${ps.length} 篇）` : ''}</button>
+        <a class="linkbtn" href="${esc(x.url)}" target="_blank" rel="noopener">Threads 原文 ↗</a>
+      </div>
+    </div>`;
   }
 
   /* ---------- Threads 文章預覽 ---------- */
@@ -610,6 +643,7 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
     const kind = state.view;
     cluster = L.markerClusterGroup({
       maxClusterRadius: 44, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
+      removeOutsideVisibleBounds: false, // 彈出卡片自動平移時，圖釘移出畫面也不收起（否則卡片會被關掉）
       iconCreateFunction: c => {
         const n = c.getChildCount(); const s = n < 10 ? 32 : n < 50 ? 38 : 46;
         return L.divIcon({ html: `<div class="cluster ${kind}" style="width:${s}px;height:${s}px">${n}</div>`, className: '', iconSize: [s, s] });
@@ -621,17 +655,17 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
       const m = L.marker([p.lat, p.lng], {
         title: p.name,
         icon: L.divIcon({ className: 'pin', html: pinSvg(kind), iconSize: [30, 40], iconAnchor: [15, 39], popupAnchor: [0, -34] }),
-      }).bindPopup(() => popupHtml(p), { maxWidth: 280 });
+      }).bindPopup(() => popupHtml(p), { maxWidth: 300, maxHeight: Math.max(220, $('map').clientHeight - 70), autoPanPaddingTopLeft: [48, 12], autoPanPaddingBottomRight: [12, 12] });
       markers[p.cid] = m;
       cluster.addLayer(m);
     });
     map.addLayer(cluster);
     const away = items.length - onMap.length;
-    $('mapnote').textContent = state.city === '全部' ? '全台分布・點圖釘找店' : `${shortCity(state.city)}・${onMap.length} 個地點`;
+    $('mapnote').textContent = !state.cities.size ? '全台分布・點圖釘找店' : `${[...state.cities].map(shortCity).join('、')}・${onMap.length} 個地點`;
     if (away) $('mapnote').textContent += `（另有 ${away} 個在日本）`;
     setTimeout(() => {
       map.invalidateSize();
-      if (state.city === '全部' && onMap.length > 3) map.fitBounds(TW_BOUNDS);
+      if (!state.cities.size && onMap.length > 3) map.fitBounds(TW_BOUNDS);
       else if (onMap.length) map.fitBounds(L.latLngBounds(onMap.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom: 15 });
       else map.fitBounds(TW_BOUNDS);
     }, 0);
@@ -660,10 +694,11 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
   }
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-    state.view = t.dataset.view; state.cat = '全部'; state.city = '全部'; save(); render();
+    state.view = t.dataset.view; state.cats.clear(); state.cities.clear(); save(); render();
   }));
-  $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { state.cat = b.dataset.cat; render(); } });
-  $('cities').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { state.city = b.dataset.city; render(); } });
+  $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { toggleIn(state.cats, b.dataset.cat); render(); } });
+  $('cities').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { toggleIn(state.cities, b.dataset.city); render(); } });
+  $('extras').addEventListener('click', e => { if (e.target.closest('[data-post]')) { state.postOnly = !state.postOnly; render(); } });
   $('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
   $('q').addEventListener('input', e => { state.q = e.target.value.trim(); render(); });
   document.addEventListener('click', e => {
