@@ -33,6 +33,9 @@ const OVERRIDES = {
   '禾豐美食': '台式小吃・飯',
   '老眷村之張吳紀': '台式小吃・飯',
   '亞米亞米': '台式小吃・飯',
+  '鼎泰豐': '麵食・水餃',
+  '澳華燒鵝': '台式小吃・飯',
+  '眷村口米干': '台式小吃・飯',
 };
 
 const CITIES = ['臺北市', '新北市', '基隆市', '桃園市', '新竹市', '臺中市', '嘉義市', '臺南市', '高雄市', '屏東縣', '金門縣'];
@@ -87,6 +90,22 @@ function attachNotes(p) {
 
 const visited = (await fetchList(LISTS.visited)).map(attachNotes);
 const wish = (await fetchList(LISTS.wish)).map(attachNotes);
+
+// extra.json：手動補進「已去過」的地點（Threads 有吃過紀錄，但不在他的已去過清單）
+const extra = existsSync('extra.json') ? JSON.parse(readFileSync('extra.json', 'utf8')) : {};
+const visitedIds = new Set(visited.map((p) => p.cid));
+for (const cid of Object.keys(extra.visited_from_wish || {})) {
+  const p = wish.find((w) => w.cid === cid);
+  if (p && !visitedIds.has(cid)) { visited.push({ ...p }); visitedIds.add(cid); }
+}
+for (const e of extra.visited_add || []) {
+  if (visitedIds.has(e.cid)) continue;
+  visited.push(attachNotes({
+    name: e.name, note: e.note || '', addr: cleanAddr(e.addr), city: cityOf(e.addr, e.lat),
+    cat: e.cat || categorize(e.name), lat: +e.lat.toFixed(6), lng: +e.lng.toFixed(6), cid: e.cid, added: 0,
+  }));
+  visitedIds.add(e.cid);
+}
 const data = { updated: new Date().toISOString().slice(0, 10), lists: LISTS, visited, wish };
 writeFileSync('data.js', 'window.LALA_DATA = ' + JSON.stringify(data) + ';\n');
 
