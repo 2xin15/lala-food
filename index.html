@@ -140,7 +140,7 @@ body::before {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
 }
-@media (max-width: 760px) { .explore { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .explore { grid-template-columns: minmax(0, 1fr); } }
 .map-box { position: relative; }
 #map {
   height: 400px; border-radius: 16px; border: 1px solid var(--line); box-shadow: var(--shadow);
@@ -153,7 +153,8 @@ body::before {
   padding: 4px 12px; border-radius: 999px; box-shadow: var(--shadow);
   max-width: calc(100% - 24px);
 }
-.filters { display: grid; gap: 16px; }
+.filters { display: grid; gap: 16px; min-width: 0; }
+.group { min-width: 0; }
 .search {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface); border-radius: 999px; padding: 0 20px;
@@ -311,6 +312,79 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
   .reader-body iframe { height: calc(100dvh - 170px); }
 }
 
+/* ---------- RWD ---------- */
+.group h2 small { margin-left: 8px; font-size: 11.5px; font-weight: 400; opacity: .8; letter-spacing: 0; }
+.explore { scroll-margin-top: 12px; }
+.filters { scroll-margin-top: 64px; }
+
+/* 卡片按鈕：等寬一排，不再折成兩行 */
+.actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; flex-wrap: nowrap; }
+.actions .btn { justify-content: center; padding: 7px 6px; font-size: 12.5px; white-space: nowrap; min-width: 0; }
+.actions .btn svg { flex: none; }
+
+/* 結果列：捲到卡片時黏在上方，隨時可以回去改篩選 */
+.result-head {
+  position: sticky; top: 0; z-index: 900;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  padding-block: calc(8px + env(safe-area-inset-top, 0px)) 8px;
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+  flex-wrap: nowrap;
+}
+.result-head .total { flex: 1; min-width: 0; }
+.to-filters {
+  appearance: none; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--chip-ink);
+}
+.to-filters svg { width: 15px; height: 15px; }
+.to-filters.on { background: var(--chip-on); border-color: var(--chip-on); color: var(--chip-on-ink); }
+.to-filters:focus-visible { outline: 2px solid var(--rose-deep); outline-offset: 2px; }
+select { padding-block: 8px; }
+
+/* 兩欄（平板、電腦）：地圖跟篩選區一樣高 */
+@media (min-width: 761px) {
+  .explore { align-items: stretch; }
+  .map-box { display: flex; flex-direction: column; }
+  #map { flex: 1; height: auto; min-height: 400px; }
+}
+
+/* 手機 */
+@media (max-width: 760px) {
+  body { font-size: 14px; }
+  .brand { padding-block: 16px 14px; gap: 10px; }
+  .brand p { font-size: 13px; }
+  .follow { padding: 6px 12px; font-size: 12.5px; }
+  .explore { gap: 14px; padding-block: 14px 4px; }
+  #map { height: 300px; }
+  .filters { gap: 12px; }
+  .group h2 { margin-bottom: 6px; }
+  /* 篩選改成一排左右滑，不用捲過一大段才看到店 */
+  .chips {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    padding: 2px max(16px, env(safe-area-inset-left, 0px));
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 28px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 28px), transparent 100%);
+  }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { padding: 7px 13px; }
+  .search input { padding: 11px 0; }
+  .grid { gap: 12px; }
+  .card { padding: 12px 14px; }
+  .card h4 { font-size: 15.5px; }
+}
+
+/* 觸控裝置：放大小連結的點擊範圍 */
+@media (pointer: coarse) {
+  .linkbtn { padding-block: 7px; margin-block: -4px; }
+  .post .row, .pop-post .row { gap: 16px; }
+  .leaflet-touch .leaflet-bar a { width: 34px; height: 34px; line-height: 34px; }
+}
+
 @media (max-width: 520px) {
   .tab { padding-inline: 14px; font-size: 15px; }
 }
@@ -353,24 +427,27 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
       <input id="q" type="search" placeholder="搜尋店名、區域、品項…" autocomplete="off">
     </label>
     <div class="group">
-      <h2>地區</h2>
-      <div class="chips" id="cities" role="group" aria-label="地區"></div>
+      <h2>地區<small>可複選</small></h2>
+      <div class="chips" id="cities" role="group" aria-label="地區（可複選）"></div>
     </div>
     <div class="group">
-      <h2>類型</h2>
-      <div class="chips" id="chips" role="group" aria-label="類型"></div>
+      <h2>類型<small>可複選</small></h2>
+      <div class="chips" id="chips" role="group" aria-label="類型（可複選）"></div>
     </div>
     <div class="group">
       <h2>其他</h2>
       <div class="chips" id="extras" role="group" aria-label="其他篩選"></div>
     </div>
-    <p class="hint">地區和類型都可以複選；再點一次可取消。</p>
   </div>
 </section>
 
 <main class="wrap">
-  <div class="result-head">
+  <div class="result-head" id="result-head">
     <span class="total" id="total"></span>
+    <button class="to-filters" id="to-filters" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span id="to-filters-text">篩選</span>
+    </button>
     <select id="sort" aria-label="排序">
       <option value="cat">依類型分組</option>
       <option value="new">最新加入在前</option>
@@ -467,6 +544,9 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
     const catPool = all.filter(p => matches(p, 'cat'));
     $('chips').innerHTML = chipsHtml(['全部', ...cats], state.cats,
       v => v === '全部' ? catPool.length : catPool.filter(p => p.cat === v).length, 'cat');
+    const active = state.cities.size + state.cats.size + (state.postOnly ? 1 : 0) + (state.q ? 1 : 0);
+    $('to-filters-text').textContent = active ? `篩選（${active}）` : '篩選';
+    $('to-filters').classList.toggle('on', active > 0);
     const postPool = all.filter(p => matches(p, 'post'));
     $('extras').innerHTML = `<button class="chip" aria-pressed="${state.postOnly}" data-post>只看有拉拉熊文章<span class="c">${postPool.filter(p => postsOf(p).length).length}</span></button>`;
   }
@@ -475,7 +555,7 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
   function linkButtons(p) {
     return `<a class="btn primary" href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener">${PIN}地圖</a>
       <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">${NAV}導航</a>
-      <a class="btn save" data-save href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener">${SAVE}存到我的清單</a>`;
+      <a class="btn save" data-save href="https://maps.google.com/?cid=${p.cid}" target="_blank" rel="noopener" title="存到我的 Google 地圖清單" aria-label="存到我的 Google 地圖清單">${SAVE}存清單</a>`;
   }
 
   const fmtDate = d => d.replace(/^(\d{4})-0?(\d+)-0?(\d+)$/, '$1/$2/$3');
@@ -698,6 +778,11 @@ dialog.reader::backdrop { background: rgba(30, 28, 22, .55); }
   }));
   $('chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { toggleIn(state.cats, b.dataset.cat); render(); } });
   $('cities').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) { toggleIn(state.cities, b.dataset.city); render(); } });
+  $('to-filters').addEventListener('click', () => {
+    const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    const one = matchMedia('(max-width: 760px)').matches;
+    (one ? document.querySelector('.filters') : document.querySelector('.explore')).scrollIntoView({ behavior: smooth, block: 'start' });
+  });
   $('extras').addEventListener('click', e => { if (e.target.closest('[data-post]')) { state.postOnly = !state.postOnly; render(); } });
   $('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
   $('q').addEventListener('input', e => { state.q = e.target.value.trim(); render(); });
