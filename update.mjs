@@ -1,6 +1,6 @@
 // 從 Google 地圖清單抓最新資料，寫入 data.js
 // 用法：node update.mjs
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 
 const LISTS = {
   visited: 'sS_9aKBvCYUpElpIW1_DqweYAWsM4A', // 跟拉拉熊一起吃（他說過好吃的 = 已去過）
@@ -130,6 +130,74 @@ for (const e of extra.visited_add || []) {
   }));
   visitedIds.add(e.cid);
 }
+
+// ---------- lala-food-feed：從拉拉熊的 Threads 貼文與回覆自動整理的「已去過」與貼文 ----------
+// 說明：https://poterpan.github.io/lala-food-feed/ 。本機的 extra.json 永遠優先：
+// visited_remove 裡的店，feed 不會加回來。不想用 feed 就把 FEED 改成 ''。
+const FEED = 'https://poterpan.github.io/lala-food-feed/lala/';
+const CATS = [...RULES.map(([c]) => c), '其他美食'];
+const CID_RE = /^\d{1,20}$/;
+const POST_URL_RE = /^https:\/\/www\.threads\.com\/@[\w.]+\/post\/[\w-]+$/;
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+// feed 是外部資料：每一筆都檢查，格式不對的直接略過（cid、分類會直接放進網頁，不能信任）
+const validAdd = (e) => isObj(e) && CID_RE.test(e.cid) && typeof e.name === 'string' && e.name.trim() !== ''
+  && typeof e.addr === 'string' && Number.isFinite(e.lat) && Number.isFinite(e.lng);
+const validPost = (x) => isObj(x) && POST_URL_RE.test(x.url) && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && typeof x.text === 'string';
+
+// 讀 feed；成功就存一份到 feed/（commit 進 repo，看得到每次 feed 改了什麼），讀不到就用上次存的
+async function feedFile(name, ok) {
+  const snap = `feed/${name}`;
+  if (!FEED) return null;
+  try {
+    const res = await fetch(FEED + name, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!ok(data)) throw new Error('格式不對');
+    mkdirSync('feed', { recursive: true });
+    writeFileSync(snap, JSON.stringify(data, null, 1) + '\n');
+    return data;
+  } catch (err) {
+    console.warn(`feed ${name} 讀不到（${err.message}），改用上次存下的 ${snap}`);
+    return existsSync(snap) ? JSON.parse(readFileSync(snap, 'utf8')) : null;
+  }
+}
+const feedExtra = (await feedFile('extra.json', (d) => isObj(d) && isObj(d.visited_from_wish) && Array.isArray(d.visited_add))) || {};
+const feedPosts = (await feedFile('posts.json', isObj)) || {};
+
+const removed = new Set(Object.keys(extra.visited_remove || {}));
+const fromFeed = { wish: 0, add: 0 };
+for (const cid of Object.keys(feedExtra.visited_from_wish || {})) {
+  if (!CID_RE.test(cid) || removed.has(cid) || visitedIds.has(cid)) continue;
+  const p = wish.find((w) => w.cid === cid);
+  if (p) { visited.push({ ...p }); visitedIds.add(cid); fromFeed.wish++; }
+}
+for (const e of feedExtra.visited_add || []) {
+  if (!validAdd(e) || removed.has(e.cid) || visitedIds.has(e.cid)) continue;
+  const cat = categorize(e.name);
+  visited.push(attachNotes({
+    name: e.name.trim(), note: '', addr: cleanAddr(e.addr), city: cityOf(e.addr, e.lat),
+    cat: cat === '其他美食' && CATS.includes(e.cat) ? e.cat : cat,
+    lat: +e.lat.toFixed(6), lng: +e.lng.toFixed(6), cid: e.cid, added: 0,
+  }));
+  visitedIds.add(e.cid);
+  fromFeed.add++;
+}
+
+// feed-posts.js：feed 找到、posts.js 還沒有的貼文（依貼文網址去重）。posts.js 是手動整理的，不會被改到
+const manualPosts = JSON.parse(readFileSync('posts.js', 'utf8')
+  .replace(/^(\s*\/\/.*\n)*/, '').replace(/^\s*window\.LALA_POSTS\s*=\s*/, '').replace(/;\s*$/, ''));
+const placeIds = new Set([...visited, ...wish].map((p) => p.cid));
+const feedOnlyPosts = {};
+for (const cid of Object.keys(feedPosts).sort()) {
+  if (!CID_RE.test(cid) || !placeIds.has(cid) || !Array.isArray(feedPosts[cid])) continue;
+  const have = new Set((manualPosts[cid] || []).map((x) => x.url));
+  const add = feedPosts[cid].filter((x) => validPost(x) && !have.has(x.url))
+    .map(({ url, date, text }) => ({ url, date, text }));
+  if (add.length) feedOnlyPosts[cid] = add;
+}
+writeFileSync('feed-posts.js', '// 由 update.mjs 依 lala-food-feed 產生，不要手動修改（手動整理的貼文請放 posts.js）\n'
+  + 'window.LALA_FEED_POSTS = ' + JSON.stringify(feedOnlyPosts, null, 1) + ';\n');
+
 // ---------- 跟上一版比較 ----------
 const old = existsSync('data.js')
   ? JSON.parse(readFileSync('data.js', 'utf8').replace(/^window\.LALA_DATA\s*=\s*/, '').replace(/;\s*$/, ''))
@@ -157,6 +225,8 @@ const diff = (label, now, before) => {
 const report = [
   sameAsOld ? '資料沒有變動，不更新 data.js。' : '資料有變動，已更新 data.js。',
   '', ...diff('已去過', visited, old && old.visited), '', ...diff('愛心清單', wish, old && old.wish),
+  '', `**Threads feed**：已去過加入 ${fromFeed.wish + fromFeed.add} 家（愛心移入 ${fromFeed.wish}、新增 ${fromFeed.add}）；`
+    + `貼文 ${Object.values(feedOnlyPosts).reduce((n, ps) => n + ps.length, 0)} 篇、${Object.keys(feedOnlyPosts).length} 家店`,
 ];
 const others = [...visited, ...wish].filter((p) => p.cat === '其他美食').map((p) => p.name);
 if (others.length) report.push('', `其他美食（可在 OVERRIDES 手動分類）：${[...new Set(others)].join('、')}`);
