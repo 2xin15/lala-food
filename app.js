@@ -247,6 +247,63 @@
   const pinIcon = (kind, sel) => L.divIcon({ className: 'pin' + (sel ? ' sel' : ''), html: pinSvg(kind), iconSize: [30, 40], iconAnchor: [15, 39] });
   const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
+  /* ---------- 道路底圖：放大到街道等級才載入 ----------
+     OpenFreeMap 的向量圖磚（OpenStreetMap 資料，免費、不需要 API key），用 MapLibre 畫。
+     只留道路、鐵路、水域和路名（沒有店家、學校等標示），背景透明，疊在原本的鄉鎮色塊上，
+     顏色取自 CSS 變數，跟著淺色／深色主題換。載入失敗就維持原本沒有道路的地圖。 */
+  const ROAD_ZOOM = 12;
+  const ROAD_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+  const ROAD_LIBS = [
+    'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css',
+    'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js',
+    'https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js',
+  ];
+  const ROAD_LAYERS = /^(water$|waterway$|building$|tunnel_|highway_(?!path)|railway|highway-name-(minor|major)$|water_name)/;
+  const loadAsset = url => new Promise((ok, fail) => {
+    const el = url.endsWith('.css') ? Object.assign(document.createElement('link'), { rel: 'stylesheet', href: url })
+      : Object.assign(document.createElement('script'), { src: url });
+    el.onload = ok; el.onerror = () => fail(new Error('載入失敗：' + url));
+    document.head.appendChild(el);
+  });
+  function roadStyle(base) {
+    const style = JSON.parse(JSON.stringify(base));
+    style.layers = style.layers.filter(l => ROAD_LAYERS.test(l.id)).map(l => {
+      const paint = { ...(l.paint || {}) }, layout = { ...(l.layout || {}) };
+      const minzoom = Math.max(l.minzoom || 0, /minor|name|building/.test(l.id) ? 14 : ROAD_ZOOM);
+      if (l.type === 'symbol') {
+        layout['text-field'] = ['get', 'name'];  // 台灣的 name 是中文；原本的樣式是「拼音＋中文」兩行
+        Object.assign(paint, { 'text-color': cssVar('--map-label'), 'text-halo-color': cssVar('--land'), 'text-halo-width': 1.5 });
+      } else if (l.id.startsWith('water')) paint[l.type === 'fill' ? 'fill-color' : 'line-color'] = cssVar('--sea');
+      // 建築只當淡淡的底紋：邊線和填色同色（原樣式的邊線接近白色，深色模式下會變成一格格白框）
+      else if (l.id === 'building') Object.assign(paint, { 'fill-color': cssVar('--town-line'), 'fill-outline-color': cssVar('--town-line'), 'fill-opacity': 0.35 });
+      else if (l.id.includes('casing')) paint['line-color'] = cssVar('--town-line');
+      else if (l.id.startsWith('railway')) Object.assign(paint, { 'line-color': cssVar('--county-line'), 'line-opacity': 0.5 });
+      else if (l.type === 'line') Object.assign(paint, { 'line-color': cssVar('--road'), 'line-opacity': 1 });
+      return { ...l, minzoom, paint, layout };
+    });
+    return style;
+  }
+  let roadsStarted = false;
+  async function addRoads(map) {
+    if (roadsStarted) return;
+    roadsStarted = true;
+    try {
+      for (const url of ROAD_LIBS) await loadAsset(url);
+      const res = await fetch(ROAD_STYLE);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const base = await res.json();
+      map.createPane('roads');
+      const layer = L.maplibreGL({ style: roadStyle(base), pane: 'roads', interactive: false }).addTo(map);
+      map.attributionControl.addAttribution('道路：<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> '
+        + '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>');
+      const restyle = () => layer.getMaplibreMap().setStyle(roadStyle(base));
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', restyle);
+      new MutationObserver(restyle).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    } catch (err) {
+      console.warn('道路底圖載入失敗，維持原本的地圖：', err);
+    }
+  }
+
   function buildMap() {
     if (map || !window.L) return;
     map = L.map('map', {
@@ -256,6 +313,8 @@
     });
     map.attributionControl.setPrefix(false).addAttribution('行政區界：內政部國土測繪中心');
     map.fitBounds(TW_BOUNDS);
+    const roadsWhenClose = () => { if (map.getZoom() >= ROAD_ZOOM) addRoads(map); };
+    map.on('zoomend', roadsWhenClose); roadsWhenClose();
     const topo = window.TW_TOPO;
     if (topo && window.topojson) {
       const towns = topojson.feature(topo, topo.objects.towns);

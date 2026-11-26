@@ -19,7 +19,7 @@
   --pin-visited: #41140e; --pin-wish: #6f8794;
   --shadow: 0 1px 2px rgba(51, 37, 27, .08), 0 4px 14px rgba(51, 37, 27, .07);
   --shadow-up: 0 -2px 14px rgba(51, 37, 27, .16);
-  --sea: #c9d5db; --land: #f8efe6; --town-line: #e4d3c4; --county-line: #a8958a; --map-label: #6f5d50;
+  --sea: #c9d5db; --land: #f8efe6; --road: #ffffff; --town-line: #e4d3c4; --county-line: #a8958a; --map-label: #6f5d50;
   --font: Roboto, "Noto Sans TC", Arial, "Microsoft JhengHei", "PingFang TC", sans-serif;
   --font-display: "Noto Serif TC", "Songti TC", serif;
   --top-h: 64px; --nav-h: 0px;
@@ -39,7 +39,7 @@
     --eaten: #e2a497; --saved: #adbcc3;
     --pin-visited: #9a3627; --pin-wish: #6f8794;
     --shadow: 0 1px 2px rgba(0,0,0,.35); --shadow-up: 0 -2px 14px rgba(0,0,0,.45);
-    --sea: #1b2326; --land: #2b2019; --town-line: #3d3027; --county-line: #6e5c4f; --map-label: #c4b2a3;
+    --sea: #1b2326; --land: #2b2019; --road: #47382d; --town-line: #3d3027; --county-line: #6e5c4f; --map-label: #c4b2a3;
   }
 }
 :root[data-theme="dark"] {
@@ -56,7 +56,7 @@
   --eaten: #e2a497; --saved: #adbcc3;
   --pin-visited: #9a3627; --pin-wish: #6f8794;
   --shadow: 0 1px 2px rgba(0,0,0,.35); --shadow-up: 0 -2px 14px rgba(0,0,0,.45);
-  --sea: #1b2326; --land: #2b2019; --town-line: #3d3027; --county-line: #6e5c4f; --map-label: #c4b2a3;
+  --sea: #1b2326; --land: #2b2019; --road: #47382d; --town-line: #3d3027; --county-line: #6e5c4f; --map-label: #c4b2a3;
 }
 
 * { box-sizing: border-box; }
@@ -303,6 +303,8 @@ select {
   transform: translate(-50%, -50%); pointer-events: none; width: max-content !important; height: auto !important;
 }
 .area-label.town { font-size: 11px; font-weight: 400; opacity: .9; }
+/* 道路底圖在鄉鎮色塊之上、地名標籤和店家圖釘之下 */
+.leaflet-roads-pane { z-index: 450; pointer-events: none; }
 .pin svg { width: 30px; height: 40px; filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.35)); display: block; transition: transform .15s; transform-origin: 50% 100%; }
 .pin.sel svg { transform: scale(1.35); filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
 .pin.sel { z-index: 1000 !important; }
