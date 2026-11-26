@@ -239,7 +239,7 @@
   /* ---------- 美食地圖 ---------- */
   let map = null, cluster = null, markers = {}, lastRandom = null;
   function pinSvg(kind) {
-    const fill = kind === 'visited' ? '#C98877' : '#6F8A84';
+    const fill = cssVar(kind === 'visited' ? '--pin-visited' : '--pin-wish') || (kind === 'visited' ? '#41140e' : '#6f8794');
     const inner = kind === 'visited'
       ? '<path d="M11 8v5.5a1.5 1.5 0 0 0 1.5 1.5V22h1v-7a1.5 1.5 0 0 0 1.5-1.5V8M13 8v4M19 8c-1.2 0-2 1.6-2 3.5S17.6 14 18.5 14V22h1V8z" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
       : '<path d="M15 21s-4.5-2.8-5.7-5.6c-.9-2 .4-4.3 2.6-4.3 1.3 0 2.2.7 2.8 1.6.6-.9 1.5-1.6 2.8-1.6 2.2 0 3.5 2.3 2.6 4.3C19.5 18.2 15 21 15 21z" fill="#fff"/>';
