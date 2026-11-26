@@ -40,6 +40,7 @@
     saved: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
     bowl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a9 9 0 0 1-18 0zM8 7c0-1.5 1-1.5 1-3M12 7c0-1.5 1-1.5 1-3M16 7c0-1.5 1-1.5 1-3"/></svg>',
     quote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.2-4.6A8 8 0 1 1 21 12z"/></svg>',
+    dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
     g: '<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>',
   };
@@ -162,8 +163,6 @@
       <button type="button" data-src="wish" aria-pressed="${state.view === 'wish'}">${I.heartS}愛心<span class="n">${D.wish.length}</span></button>
     </div>`;
     $$('.seg-slot').forEach(s => { s.innerHTML = html; });
-    $('follow').href = SHARE_LINKS[state.view];
-    $('follow-text').textContent = state.view === 'visited' ? '「已去過」整份存到我的 Google 地圖' : '「愛心清單」整份存到我的 Google 地圖';
   }
 
   /* ---------- 共用片段 ---------- */
@@ -323,7 +322,7 @@
   }
   function renderSide(items) {
     const sorted = [...items].sort((a, b) => ORDER.indexOf(a.cat) - ORDER.indexOf(b.cat) || b.added - a.added);
-    $('side-count').innerHTML = `<span>共 ${items.length} 個地點</span><span>點地圖上的圖釘或下面的店名</span>`;
+    $('side-count').innerHTML = `<span>共 ${items.length} 個地點</span><button class="linkbtn" type="button" data-open-save>${I.save}全部收藏到 Google 地圖</button>`;
     $('side-rows').innerHTML = sorted.length ? sorted.map(p => rowHtml(p, { pick: true, lala: true })).join('') : '<li class="empty">找不到符合的店，試試把篩選改回「全部」。</li>';
   }
 
@@ -486,6 +485,78 @@
   }
   function refreshAllMarks() { allPlaces.forEach((_, cid) => { if (document.querySelector(`[data-cid="${cid}"]`)) refreshMarks(cid); }); renderBadge(); }
 
+  /* ---------- 全部收藏到 Google 地圖 ----------
+     Google 沒有開放把地點寫進使用者清單的 API，所以提供兩種一次收藏的方式：
+     1. 追蹤拉拉熊的整份清單（之後新增的店會同步）
+     2. 下載目前篩選結果的 KML，匯入「Google 我的地圖」變成自己的地圖 */
+  const listLabel = () => state.view === 'visited' ? '已去過' : '愛心清單';
+  function filterSummary() {
+    const parts = [];
+    if (state.cities.size) parts.push([...state.cities].map(shortCity).join('、'));
+    if (state.cats.size) parts.push([...state.cats].join('、'));
+    if (state.postOnly) parts.push('有拉拉熊文章');
+    if (state.q) parts.push(`搜尋「${state.q}」`);
+    return parts.join('／');
+  }
+  function openSave() {
+    const items = filtered();
+    const n = items.length, fs = filterSummary();
+    const unsaved = items.filter(p => !Marks.has('saved', p.cid)).length;
+    $('save-dlg-body').innerHTML = `
+      <p class="save-lead">Google 地圖不讓網站直接替你加入收藏，下面兩種方式都只要點一下：</p>
+      <section class="save-opt">
+        <h4><span class="num">1</span>追蹤拉拉熊的「${listLabel()}」<span class="tag">推薦</span></h4>
+        <p>整份清單會出現在 Google 地圖 app 的「已儲存」裡，他之後新增的店也會自動同步。（網站另外補充的店不在他的清單裡，要用下面的方式 2。）</p>
+        <a class="pill pill-on" href="${SHARE_LINKS[state.view]}" target="_blank" rel="noopener" data-follow>${I.save}打開清單，按「追蹤」</a>
+      </section>
+      <section class="save-opt">
+        <h4><span class="num">2</span>把 ${n} 家匯入成我自己的地圖</h4>
+        <p>下載${fs ? `目前篩選（${esc(fs)}）的` : '這份清單的'} ${n} 家（KML 檔），匯入「Google 我的地圖」。每家店會附上 Google 地圖連結和拉拉熊的 Threads 文章。可以自己刪改，但不會自動同步。</p>
+        <button class="pill" type="button" data-kml ${n ? '' : 'disabled'}>${I.dl}下載 ${n} 家（KML）</button>
+        <ol class="steps">
+          <li>打開 <a href="https://www.google.com/maps/d/" target="_blank" rel="noopener">Google 我的地圖</a>，按「建立新地圖」</li>
+          <li>在左邊的圖層按「匯入」，選剛剛下載的檔案</li>
+          <li>之後在 Google 地圖 app 的「已儲存 → 地圖」就看得到</li>
+        </ol>
+      </section>
+      ${unsaved ? `<div class="save-foot"><span>收藏好了？在「我的紀錄」一次標記這 ${n} 家為已存。</span><button class="linkbtn" type="button" data-mark-all-saved>全部標記已存（${unsaved} 家）</button></div>` : ''}`;
+    lastFocus = document.activeElement;
+    $('save-dlg').showModal();
+  }
+  const xml = s => String(s).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
+  function downloadKml() {
+    const items = filtered();
+    if (!items.length) return;
+    const title = `跟拉拉熊一起吃・${listLabel()}` + (filterSummary() ? `（${filterSummary()}）` : '');
+    const place = p => {
+      const lines = [`${p.cat}・${placeOf(p)}`, p.addr, `Google 地圖：https://maps.google.com/?cid=${p.cid}`];
+      postsOf(p).forEach(x => lines.push(`拉拉熊 ${fmtDate(x.date)}：${x.url}`));
+      return `<Placemark><name>${xml(p.name)}</name><description>${xml(lines.join('\n'))}</description>` +
+        `<Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+    };
+    const folders = ORDER.filter(c => items.some(p => p.cat === c))
+      .map(c => `<Folder><name>${xml(c)}</name>${items.filter(p => p.cat === c).map(place).join('')}</Folder>`).join('');
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(title)}</name>` +
+      `<description>${xml(`資料來自拉拉熊的 Google 地圖清單（${D.updated || ''}）與 Threads。https://2xin15.github.io/lala-food/`)}</description>${folders}</Document></kml>\n`;
+    const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `拉拉熊-${listLabel()}-${items.length}家.kml`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast(`已下載 ${items.length} 家。接著到 <b>Google 我的地圖</b> 建立新地圖並匯入這個檔案。`);
+  }
+  function markAllSaved() {
+    const items = filtered().filter(p => !Marks.has('saved', p.cid));
+    if (!items.length) return;
+    const bag = Marks.data.saved || (Marks.data.saved = {});
+    const now = Date.now();
+    items.forEach((p, i) => { bag[p.cid] = now + i; });
+    Marks.persist();
+    items.forEach(p => refreshMarks(p.cid));
+    $('save-dlg').close();
+    toast(`已把 ${items.length} 家標記為已存，可以在「我的紀錄」查看。`);
+  }
+
   /* ---------- Threads 文章預覽 ---------- */
   let lastFocus = null;
   function openReader(cid, i) {
@@ -590,6 +661,11 @@
     if (t.closest('[data-open-filters]')) { placeFilters(); $('filter-dlg').showModal(); return; }
     if (t.closest('[data-clear-filters]')) { state.cats.clear(); state.cities.clear(); state.postOnly = false; state.q = ''; $('q').value = ''; onFilterChange(); return; }
     if (t.closest('#filter-dlg [data-close]')) { $('filter-dlg').close(); return; }
+    if (t.closest('#save-dlg [data-close]')) { $('save-dlg').close(); return; }
+    if (t.closest('[data-open-save]')) { openSave(); return; }
+    if ((el = t.closest('[data-follow]'))) { toast('已打開 Google 地圖清單。點 <b>「追蹤」</b>，整份清單就會出現在你的「已儲存」裡。'); return; }
+    if (t.closest('[data-kml]')) { downloadKml(); return; }
+    if (t.closest('[data-mark-all-saved]')) { markAllSaved(); return; }
     if ((el = t.closest('[data-layout]'))) { state.layout = el.dataset.layout; store('lala-layout', state.layout); renderList(filtered()); return; }
     if ((el = t.closest('[data-metab]'))) { state.meTab = el.dataset.metab; renderMe(); return; }
     if (t.closest('[data-signin]')) { signIn(); return; }
@@ -599,10 +675,9 @@
       if (!Marks.has('saved', cid)) toast('已在 Google 地圖打開這家店。按 <b>「儲存」</b> 存好後，回來標記一下：', '標記為已存', () => Marks.set('saved', cid, true));
       return;
     }
-    if (t.closest('#follow')) toast('已打開 Google 地圖清單。點 <b>「追蹤」</b>，整份清單就會出現在你的「已儲存」裡。');
   });
   // 點對話框外圍就關閉
-  ['filter-dlg', 'detail-dlg', 'reader'].forEach(id => $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).close(); }));
+  ['filter-dlg', 'save-dlg', 'detail-dlg', 'reader'].forEach(id => $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).close(); }));
   $('detail-dlg').addEventListener('close', () => { $('detail-dlg-body').innerHTML = ''; if (lastFocus && document.contains(lastFocus)) lastFocus.focus(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.sel && !document.querySelector('dialog[open]')) deselect(); });
 

@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&display=swap">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/MarkerCluster.css">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=12">
 
 <header class="top" id="top">
   <div class="top-in">
@@ -58,6 +58,7 @@
           <div class="seg-slot"></div>
           <button class="pill" data-open-filters type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="filter-label">篩選</span></button>
           <button class="pill pill-dice" data-random type="button" aria-label="隨機推薦"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg><span>隨機</span></button>
+          <button class="pill" data-open-save type="button" aria-label="全部收藏到 Google 地圖"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/></svg><span>收藏</span></button>
         </div>
         <div class="map-note" id="mapnote"></div>
         <div class="sheet" id="sheet" hidden></div>
@@ -70,10 +71,10 @@
     <div class="wrap">
       <div class="list-top">
         <div class="seg-slot"></div>
-        <a class="follow" id="follow" href="#" target="_blank" rel="noopener">
+        <button class="follow" type="button" data-open-save>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/></svg>
-          <span id="follow-text">整份清單存到我的 Google 地圖</span>
-        </a>
+          <span>全部收藏到 Google 地圖</span>
+        </button>
       </div>
       <div class="filter-slot" id="slot-list"></div>
       <div class="result-head" id="result-head">
@@ -130,6 +131,16 @@
   </div>
 </dialog>
 
+<dialog class="panel-dlg save-dlg" id="save-dlg" aria-labelledby="save-dlg-title">
+  <div class="panel-in">
+    <div class="panel-head">
+      <h3 id="save-dlg-title">全部收藏到 Google 地圖</h3>
+      <button class="icon-btn" type="button" data-close aria-label="關閉">×</button>
+    </div>
+    <div class="panel-body" id="save-dlg-body"></div>
+  </div>
+</dialog>
+
 <dialog class="panel-dlg detail-dlg" id="detail-dlg" aria-label="店家資訊">
   <div class="panel-in" id="detail-dlg-body"></div>
 </dialog>
@@ -154,9 +165,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="data.js?v=10"></script>
-<script src="posts.js?v=10"></script>
+<script src="data.js?v=12"></script>
+<script src="posts.js?v=12"></script>
 <script src="taiwan.js"></script>
-<script src="firebase-config.js?v=10"></script>
-<script type="module" src="cloud.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="firebase-config.js?v=12"></script>
+<script type="module" src="cloud.js?v=12"></script>
+<script src="app.js?v=12"></script>

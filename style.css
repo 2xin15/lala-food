@@ -415,6 +415,21 @@ dialog.reader::backdrop { background: rgba(33, 24, 18, .6); }
 .toast b { color: var(--ciel); font-weight: 700; }
 .toast button { appearance: none; border: 0; cursor: pointer; border-radius: 999px; padding: 6px 12px; background: var(--ciel); color: var(--espresso); font-size: 13px; font-weight: 700; white-space: nowrap; }
 
+/* 全部收藏到 Google 地圖 */
+.save-lead { margin: 0 0 14px; color: var(--ink-2); font-size: 13.5px; }
+.save-opt { display: grid; gap: 8px; justify-items: start; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin-bottom: 12px; }
+.save-opt h4 { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--font-display); font-size: 16px; letter-spacing: .02em; }
+.save-opt h4 .num { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--primary); color: var(--primary-ink); font-family: var(--font); font-size: 12px; }
+.save-opt p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+.save-opt .pill { text-decoration: none; box-shadow: none; }
+.save-opt .pill[disabled] { opacity: .5; cursor: not-allowed; }
+.steps { margin: 2px 0 0; padding-left: 20px; font-size: 12.5px; color: var(--ink-2); line-height: 1.7; }
+.steps a { color: var(--teal-deep); }
+.save-foot { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); border-top: 1px dashed var(--line); padding-top: 12px; }
+.side-count .linkbtn { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.side-count .linkbtn:hover { text-decoration: underline; }
+.list-top button.follow { appearance: none; border: 0; cursor: pointer; font-family: inherit; }
+
 /* ---------- 平板 ---------- */
 @media (max-width: 1100px) {
   .brand-text small { display: none; }
@@ -519,6 +534,11 @@ dialog.reader::backdrop { background: rgba(33, 24, 18, .6); }
   .stats { gap: 8px; }
   .stat { padding: 10px 12px; }
   .stat b { font-size: 20px; }
+}
+@media (max-width: 430px) {
+  /* 地圖工具列放不下：隨機、收藏只留圖示（按鈕有 aria-label） */
+  .map-bar [data-random] span, .map-bar [data-open-save] span { display: none; }
+  .map-bar [data-random], .map-bar [data-open-save] { padding: 8px 10px; }
 }
 @media (max-width: 380px) {
   .brand-text b { font-size: 15px; }
