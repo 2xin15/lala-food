@@ -1,0 +1,67 @@
+# 每天自動抓拉拉熊的兩份 Google 地圖清單，有變動才 commit data.js（GitHub Pages 會自動重新部署）
+name: 每日更新清單資料
+
+on:
+  schedule:
+    - cron: '17 19 * * *'   # UTC 19:17 = 台灣時間每天 03:17
+  workflow_dispatch:         # Actions 頁面可以手動按「Run workflow」
+    inputs:
+      force:
+        description: '略過安全檢查（清單真的大量刪減時才勾）'
+        type: boolean
+        default: false
+  push:                      # 改了抓取程式或手動補充檔，就馬上重算一次
+    branches: [main]
+    paths:
+      - update.mjs
+      - extra.json
+      - notes.json
+      - .github/workflows/update-data.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 抓 Google 地圖清單
+        run: node update.mjs
+        env:
+          FORCE: ${{ inputs.force && '1' || '' }}
+
+      - name: 有變動就 commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data.js; then
+            echo "資料沒有變動"
+          else
+            git add data.js
+            git commit -m "自動更新清單資料 $(TZ=Asia/Taipei date +%F)"
+            git push
+          fi
+
+      # 公開 repo 連續 60 天沒有 commit，GitHub 會停用排程；超過 50 天就寫一筆心跳保持運作
+      - name: 保持排程運作
+        run: |
+          last=$(git log -1 --format=%ct)
+          days=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "距離上次 commit $days 天"
+          if [ "$days" -ge 50 ]; then
+            TZ=Asia/Taipei date '+%F %T' > .github/keepalive
+            git add .github/keepalive
+            git commit -m "保持每日更新排程運作"
+            git push
+          fi

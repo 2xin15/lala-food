@@ -20,7 +20,15 @@
 
 ## 更新資料
 
-`node update.mjs`，然後 commit 並 push `data.js`。
+**自動**：GitHub Actions（`.github/workflows/update-data.yml`）每天台灣時間 03:17 抓兩份 Google 地圖清單，有變動才 commit `data.js`，GitHub Pages 會自動重新部署。
+
+- 執行紀錄與每次新增／移除的店：repo 的 **Actions** 分頁 →「每日更新清單資料」
+- 想馬上更新：同一頁按 **Run workflow**
+- 改了 `update.mjs`、`extra.json`、`notes.json` 推上去，也會自動重算
+- 安全檢查：任一清單一次少超過三成會判定抓取失敗、不更新（GitHub 會寄信通知）。確定是真的刪減，Run workflow 時勾「略過安全檢查」
+- 公開 repo 連續 60 天沒有 commit 會停用排程；工作流程超過 50 天會自動寫一筆 `.github/keepalive` 保持運作
+
+**手動**：`node update.mjs`，然後 commit 並 push `data.js`。
 
 改了 `app.js`、`style.css` 或資料檔之後，把 `index.html` 裡的 `?v=數字` 加 1，避免訪客拿到舊的快取。
 

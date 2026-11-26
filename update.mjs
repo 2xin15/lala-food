@@ -1,6 +1,6 @@
 // 從 Google 地圖清單抓最新資料，寫入 data.js
 // 用法：node update.mjs
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
 
 const LISTS = {
   visited: 'sS_9aKBvCYUpElpIW1_DqweYAWsM4A', // 跟拉拉熊一起吃（他說過好吃的 = 已去過）
@@ -54,12 +54,31 @@ function cleanAddr(a) {
   return a.replace(/^\d{3,6}/, '').replace(/(臺|台)(北|中|南)市/, '$1$2市');
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 抓一份 Google 地圖清單；失敗會重試 3 次，格式不對就整個停下（不寫入壞資料）
 async function fetchList(id) {
   const url = `https://www.google.com/maps/preview/entitylist/getlist?authuser=0&hl=zh-TW&gl=tw&pb=!1m4!1s${id}!2e1!3m1!1e1!2e2!3e2!4i500!16b1`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  const text = await res.text();
-  const L = JSON.parse(text.slice(text.indexOf('\n') + 1))[0];
-  return (L[8] || []).map((e) => {
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-TW,zh;q=0.9' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const L = JSON.parse(text.slice(text.indexOf('\n') + 1))[0];
+      if (!L || !Array.isArray(L[8])) throw new Error('回傳的清單格式不對');
+      return parseList(L[8]);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`清單 ${id} 第 ${attempt} 次抓取失敗：${err.message}`);
+      if (attempt < 3) await sleep(5000 * attempt);
+    }
+  }
+  throw new Error(`抓不到清單 ${id}：${lastErr.message}`);
+}
+
+function parseList(entries) {
+  return entries.filter((e) => e && e[1] && e[1][6] && e[1][5]).map((e) => {
     let cid = BigInt(e[1][6][1]);
     if (cid < 0n) cid += 2n ** 64n;
     const addr = e[1][4] || e[1][2] || '';
@@ -111,10 +130,41 @@ for (const e of extra.visited_add || []) {
   }));
   visitedIds.add(e.cid);
 }
-const data = { updated: new Date().toISOString().slice(0, 10), lists: LISTS, visited, wish };
-writeFileSync('data.js', 'window.LALA_DATA = ' + JSON.stringify(data) + ';\n');
+// ---------- 跟上一版比較 ----------
+const old = existsSync('data.js')
+  ? JSON.parse(readFileSync('data.js', 'utf8').replace(/^window\.LALA_DATA\s*=\s*/, '').replace(/;\s*$/, ''))
+  : null;
 
-const count = (arr) => arr.reduce((m, p) => ((m[p.cat] = (m[p.cat] || 0) + 1), m), {});
-console.log(`已去過 ${visited.length} 家`, count(visited));
-console.log(`愛心清單 ${wish.length} 個`, count(wish));
-console.log('其他美食（可在 OVERRIDES 手動分類）:', [...visited, ...wish].filter((p) => p.cat === '其他美食').map((p) => p.name).join('、'));
+// 安全檢查：數量一次少超過三成，多半是抓取出問題，不要用壞資料蓋掉網站（FORCE=1 可略過）
+if (old && !process.env.FORCE) {
+  for (const [label, now, before] of [['已去過', visited.length, old.visited.length], ['愛心清單', wish.length, old.wish.length]]) {
+    if (before >= 10 && now < before * 0.7) {
+      throw new Error(`${label}從 ${before} 筆掉到 ${now} 筆，疑似抓取失敗，這次不更新。確定是真的變少，請用 FORCE=1 重跑。`);
+    }
+  }
+}
+
+const body = { lists: LISTS, visited, wish };
+const sameAsOld = old && JSON.stringify({ lists: old.lists, visited: old.visited, wish: old.wish }) === JSON.stringify(body);
+
+const diff = (label, now, before) => {
+  const b = new Map((before || []).map((p) => [p.cid, p])), n = new Map(now.map((p) => [p.cid, p]));
+  const added = now.filter((p) => !b.has(p.cid)).map((p) => p.name);
+  const removed = (before || []).filter((p) => !n.has(p.cid)).map((p) => p.name);
+  return [`**${label}**：${now.length} 筆` + (old ? `（新增 ${added.length}、移除 ${removed.length}）` : ''),
+    ...added.map((x) => `- ＋ ${x}`), ...removed.map((x) => `- － ${x}`)];
+};
+const report = [
+  sameAsOld ? '資料沒有變動，不更新 data.js。' : '資料有變動，已更新 data.js。',
+  '', ...diff('已去過', visited, old && old.visited), '', ...diff('愛心清單', wish, old && old.wish),
+];
+const others = [...visited, ...wish].filter((p) => p.cat === '其他美食').map((p) => p.name);
+if (others.length) report.push('', `其他美食（可在 OVERRIDES 手動分類）：${[...new Set(others)].join('、')}`);
+
+if (!sameAsOld) {
+  const data = { updated: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }), ...body };
+  writeFileSync('data.js', 'window.LALA_DATA = ' + JSON.stringify(data) + ';\n');
+}
+console.log(report.join('\n'));
+// 在 GitHub Actions 的執行頁面顯示摘要
+if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report.join('\n') + '\n');
