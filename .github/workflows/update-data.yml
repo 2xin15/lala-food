@@ -1,9 +1,9 @@
-# 每天自動抓拉拉熊的兩份 Google 地圖清單，有變動才 commit data.js（GitHub Pages 會自動重新部署）
+# 每天自動抓拉拉熊的兩份 Google 地圖清單和 lala-food-feed，有變動才 commit（GitHub Pages 會自動重新部署）
 name: 每日更新清單資料
 
 on:
   schedule:
-    - cron: '17 19 * * *'   # UTC 19:17 = 台灣時間每天 03:17
+    - cron: '17 20 * * *'   # UTC 20:17 = 台灣時間每天 04:17（排在 lala-food-feed 03:30 那次更新之後）
   workflow_dispatch:         # Actions 頁面可以手動按「Run workflow」
     inputs:
       force:
@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: 抓 Google 地圖清單
+      - name: 抓 Google 地圖清單與 lala-food-feed
         run: node update.mjs
         env:
           FORCE: ${{ inputs.force && '1' || '' }}
@@ -45,10 +45,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- data.js; then
+          git add data.js feed-posts.js
+          if [ -d feed ]; then git add feed; fi
+          if git diff --cached --quiet; then
             echo "資料沒有變動"
           else
-            git add data.js
             git commit -m "自動更新清單資料 $(TZ=Asia/Taipei date +%F)"
             git push
           fi

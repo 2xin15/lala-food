@@ -4,7 +4,9 @@
 (function () {
   'use strict';
   const D = window.LALA_DATA || { visited: [], wish: [], lists: {} };
-  const POSTS = window.LALA_POSTS || {};
+  // 手動整理的 posts.js 在前，lala-food-feed 自動找到的貼文（feed-posts.js，update.mjs 產生）接在後面
+  const POSTS = { ...(window.LALA_POSTS || {}) };
+  for (const [cid, ps] of Object.entries(window.LALA_FEED_POSTS || {})) POSTS[cid] = [...(POSTS[cid] || []), ...ps];
   const CLOUD = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
   const ORDER = ['台式小吃・飯', '麵食・水餃', '牛肉麵・牛肉湯', '拉麵', '燒烤・鍋物', '異國料理', '早午餐・漢堡・麵包', '甜點・冰品', '飲料・咖啡・酒', '其他美食', '景點・生活'];
   const CITY_ORDER = ['台北市', '新北市', '基隆市', '桃園市', '新竹市', '台中市', '嘉義市', '台南市', '高雄市', '屏東縣', '金門縣', '日本', '其他'];
